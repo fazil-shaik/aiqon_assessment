@@ -118,14 +118,3 @@ aiqon/
 ├── run.sh                            # One-click startup script
 └── README.md                         # Project documentation and guide
 ```
-
----
-
-## Deliverables Summary for Aiqon Evaluation
-
-1. **Code Repository:** Clean, modular, fully runnable Python backend and Streamlit frontend.
-2. **Technical Report:**
-   - PDF format: [`Aiqon_ETA_Delay_Propagation_Technical_Report.pdf`](Aiqon_ETA_Delay_Propagation_Technical_Report.pdf)
-   - Markdown format: [`REPORT.md`](REPORT.md)
-3. **Interactive Demo:** Streamlit web application with fleet dashboard, in-flight predictor, waterfall diagnostics, benchmark evaluations, and synthetic data generator.
-4. **Submission Target:** `info@aiqon.in`
