@@ -1,6 +1,7 @@
 """
 Multi-Stage Delay Propagation and ETA Prediction Engine.
 Models cascading delays, berth window penalties, buffer absorption, and in-flight milestone inference.
+Delegates feature extraction to LogisticsFeaturePipeline.
 """
 
 import numpy as np
@@ -9,24 +10,14 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Tuple, List, Optional
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, roc_auc_score, f1_score, accuracy_score
-import joblib
 import os
 
-FEATURE_COLS_STATIC = [
-    "distance_nm",
-    "total_sched_hours",
-    "sched_transit_hours",
-    "sched_port_dwell_hours",
-    "sched_inland_hours",
-    "origin_congestion_idx",
-    "transit_weather_severity",
-    "dest_port_congestion_idx",
-    "inland_traffic_idx",
-]
-
-CATEGORICAL_COLS = ["route_id", "carrier", "cargo_priority", "customs_risk_tier"]
+from models.feature_pipeline import (
+    LogisticsFeaturePipeline,
+    FEATURE_COLS_STATIC,
+    CATEGORICAL_COLS
+)
 
 class DelayPropagationEngine:
     """
@@ -39,7 +30,7 @@ class DelayPropagationEngine:
     """
 
     def __init__(self):
-        self.encoder = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
+        self.pipeline = LogisticsFeaturePipeline()
         self.regressor = GradientBoostingRegressor(
             n_estimators=120, max_depth=4, learning_rate=0.08, random_state=42
         )
@@ -53,77 +44,20 @@ class DelayPropagationEngine:
             "port": RandomForestRegressor(n_estimators=60, max_depth=4, random_state=42),
             "inland": RandomForestRegressor(n_estimators=60, max_depth=4, random_state=42),
         }
-        self.feature_names_ = []
         self.is_fitted = False
-        self.train_metrics = {}
+        self.train_metrics: Dict[str, float] = {}
 
-    def _engineer_features(self, df: pd.DataFrame, milestone: int = 3) -> pd.DataFrame:
-        """
-        Engineers interaction and propagation features according to current shipment milestone.
-        If milestone < k, subsequent realized stage delays are masked out (set to 0 / imputed).
-        """
-        feat_df = df.copy()
-
-        # Non-linear congestion and risk interaction terms
-        feat_df["weather_x_distance"] = feat_df["transit_weather_severity"] * (feat_df["distance_nm"] / 1000.0)
-        feat_df["port_congestion_x_dwell"] = feat_df["dest_port_congestion_idx"] * feat_df["sched_port_dwell_hours"]
-        feat_df["inland_traffic_x_distance"] = feat_df["inland_traffic_idx"] * feat_df["sched_inland_hours"]
-
-        # Milestone-conditioned realized stage features
-        if milestone >= 1:
-            feat_df["known_origin_delay"] = feat_df["stage_origin_delay_hours"]
-        else:
-            feat_df["known_origin_delay"] = 0.0
-
-        if milestone >= 2:
-            feat_df["known_transit_delay"] = feat_df["stage_transit_delay_hours"]
-            feat_df["cum_delay_at_port"] = feat_df["known_origin_delay"] + feat_df["known_transit_delay"]
-            # Berth window risk multiplier
-            feat_df["berth_risk_factor"] = (feat_df["cum_delay_at_port"] > 10.0).astype(float) * feat_df["dest_port_congestion_idx"]
-        else:
-            feat_df["known_transit_delay"] = 0.0
-            feat_df["cum_delay_at_port"] = feat_df["known_origin_delay"]
-            feat_df["berth_risk_factor"] = 0.0
-
-        if milestone >= 3:
-            feat_df["known_port_waiting"] = feat_df["stage_port_waiting_hours"]
-            feat_df["known_customs_dwell"] = feat_df["stage_customs_dwell_hours"]
-            feat_df["cum_delay_post_customs"] = feat_df["cum_delay_at_port"] + feat_df["known_port_waiting"] + feat_df["known_customs_dwell"]
-        else:
-            feat_df["known_port_waiting"] = 0.0
-            feat_df["known_customs_dwell"] = 0.0
-            feat_df["cum_delay_post_customs"] = feat_df["cum_delay_at_port"]
-
-        feat_df["milestone_stage"] = milestone
-        return feat_df
+    @property
+    def feature_names_(self) -> List[str]:
+        return self.pipeline.feature_names_
 
     def _prepare_matrix(self, df: pd.DataFrame, fit_encoder: bool = False, milestone: int = 3) -> np.ndarray:
-        engineered = self._engineer_features(df, milestone=milestone)
-        
-        num_cols = FEATURE_COLS_STATIC + [
-            "weather_x_distance",
-            "port_congestion_x_dwell",
-            "inland_traffic_x_distance",
-            "known_origin_delay",
-            "known_transit_delay",
-            "cum_delay_at_port",
-            "berth_risk_factor",
-            "known_port_waiting",
-            "known_customs_dwell",
-            "cum_delay_post_customs",
-            "milestone_stage"
-        ]
-        
-        X_num = engineered[num_cols].values
-        
-        if fit_encoder:
-            X_cat = self.encoder.fit_transform(engineered[CATEGORICAL_COLS])
-            cat_feat_names = list(self.encoder.get_feature_names_out(CATEGORICAL_COLS))
-            self.feature_names_ = num_cols + cat_feat_names
-        else:
-            X_cat = self.encoder.transform(engineered[CATEGORICAL_COLS])
-            
-        return np.hstack([X_num, X_cat])
+        """Internal delegation to feature pipeline for matrix preparation."""
+        return self.pipeline.prepare_matrix(df, fit_encoder=fit_encoder, milestone=milestone)
+
+    def _engineer_features(self, df: pd.DataFrame, milestone: int = 3) -> pd.DataFrame:
+        """Internal delegation to feature pipeline for feature engineering."""
+        return self.pipeline.engineer_features(df, milestone=milestone)
 
     def fit(self, df: pd.DataFrame) -> "DelayPropagationEngine":
         """
@@ -132,41 +66,43 @@ class DelayPropagationEngine:
         """
         # Split train/test
         train_df, val_df = train_test_split(df, test_size=0.20, random_state=42)
-        
-        # We augment training across all milestones so models generalize to in-flight inference
+
+        # Augment training across all milestones for in-flight generalization
         X_train_list, y_reg_train_list, y_cls_train_list = [], [], []
         for m in [0, 1, 2, 3]:
             X_m = self._prepare_matrix(train_df, fit_encoder=(m == 0), milestone=m)
             X_train_list.append(X_m)
             y_reg_train_list.append(train_df["total_delay_hours"].values)
             y_cls_train_list.append(train_df["is_delayed"].values)
-            
+
         X_train = np.vstack(X_train_list)
         y_reg_train = np.concatenate(y_reg_train_list)
         y_cls_train = np.concatenate(y_cls_train_list)
-        
+
         # Fit main models
         self.regressor.fit(X_train, y_reg_train)
         self.classifier.fit(X_train, y_cls_train)
-        
+
         # Fit stage-specific models
         X_stage_base = self._prepare_matrix(train_df, fit_encoder=False, milestone=0)
         self.stage_models["origin"].fit(X_stage_base, train_df["stage_origin_delay_hours"])
         self.stage_models["transit"].fit(X_stage_base, train_df["stage_transit_delay_hours"])
-        self.stage_models["port"].fit(X_stage_base, train_df["stage_port_waiting_hours"] + train_df["stage_customs_dwell_hours"])
+        self.stage_models["port"].fit(
+            X_stage_base, train_df["stage_port_waiting_hours"] + train_df["stage_customs_dwell_hours"]
+        )
         self.stage_models["inland"].fit(X_stage_base, train_df["stage_inland_delay_hours"])
-        
+
         self.is_fitted = True
-        
+
         # Compute validation metrics
         X_val = self._prepare_matrix(val_df, fit_encoder=False, milestone=3)
         y_val_reg = val_df["total_delay_hours"].values
         y_val_cls = val_df["is_delayed"].values
-        
+
         pred_reg = self.regressor.predict(X_val)
         pred_cls_prob = self.classifier.predict_proba(X_val)[:, 1]
         pred_cls = (pred_cls_prob >= 0.5).astype(int)
-        
+
         self.train_metrics = {
             "reg_mae": float(mean_absolute_error(y_val_reg, pred_reg)),
             "reg_rmse": float(np.sqrt(mean_squared_error(y_val_reg, pred_reg))),
@@ -191,49 +127,65 @@ class DelayPropagationEngine:
         """
         if not self.is_fitted:
             raise RuntimeError("Model is not fitted yet.")
-            
+
         df_single = pd.DataFrame([shipment_dict])
         X = self._prepare_matrix(df_single, fit_encoder=False, milestone=milestone)
-        
+
         pred_delay_hours = float(self.regressor.predict(X)[0])
         pred_delay_prob = float(self.classifier.predict_proba(X)[0, 1])
-        
+
         # Calculate ETA
         sched_arrival = pd.to_datetime(shipment_dict["sched_arrival"])
         pred_eta = sched_arrival + timedelta(hours=pred_delay_hours)
-        
+
         # Risk classification
         if pred_delay_hours <= 1.0 and pred_delay_prob < 0.35:
             severity = "On-Time / Early"
-            badge_color = "#10B981"  # Emerald
+            badge_color = "#10B981"
         elif pred_delay_hours <= 8.0:
             severity = "Minor Delay (Low Risk)"
-            badge_color = "#3B82F6"  # Blue
+            badge_color = "#3B82F6"
         elif pred_delay_hours <= 24.0:
             severity = "Moderate Delay (Medium Risk)"
-            badge_color = "#F59E0B"  # Amber
+            badge_color = "#F59E0B"
         else:
             severity = "Critical Delay (High Risk)"
-            badge_color = "#EF4444"  # Red
-            
+            badge_color = "#EF4444"
+
         # Stage Cascade Breakdown
         X_base = self._prepare_matrix(df_single, fit_encoder=False, milestone=0)
-        
-        s1_origin = float(shipment_dict.get("stage_origin_delay_hours", 0.0)) if milestone >= 1 else float(self.stage_models["origin"].predict(X_base)[0])
-        s2_transit = float(shipment_dict.get("stage_transit_delay_hours", 0.0)) if milestone >= 2 else float(self.stage_models["transit"].predict(X_base)[0])
-        s3_port = (float(shipment_dict.get("stage_port_waiting_hours", 0.0)) + float(shipment_dict.get("stage_customs_dwell_hours", 0.0))) if milestone >= 3 else float(self.stage_models["port"].predict(X_base)[0])
-        s4_inland = float(shipment_dict.get("stage_inland_delay_hours", 0.0)) if milestone >= 4 else float(self.stage_models["inland"].predict(X_base)[0])
-        
+
+        s1_origin = (
+            float(shipment_dict.get("stage_origin_delay_hours", 0.0))
+            if milestone >= 1
+            else float(self.stage_models["origin"].predict(X_base)[0])
+        )
+        s2_transit = (
+            float(shipment_dict.get("stage_transit_delay_hours", 0.0))
+            if milestone >= 2
+            else float(self.stage_models["transit"].predict(X_base)[0])
+        )
+        s3_port = (
+            (float(shipment_dict.get("stage_port_waiting_hours", 0.0)) + float(shipment_dict.get("stage_customs_dwell_hours", 0.0)))
+            if milestone >= 3
+            else float(self.stage_models["port"].predict(X_base)[0])
+        )
+        s4_inland = (
+            float(shipment_dict.get("stage_inland_delay_hours", 0.0))
+            if milestone >= 4
+            else float(self.stage_models["inland"].predict(X_base)[0])
+        )
+
         # Buffer absorption modeling
         absorbed = float(shipment_dict.get("buffer_absorbed_hours", 0.0))
-        
+
         cascade = [
             {"stage": "Origin Departure", "delay_hours": round(s1_origin, 1), "status": "Realized" if milestone >= 1 else "Forecasted"},
             {"stage": "Ocean Transit (Net)", "delay_hours": round(s2_transit, 1), "status": "Realized" if milestone >= 2 else "Forecasted"},
             {"stage": "Port Berth & Customs", "delay_hours": round(s3_port, 1), "status": "Realized" if milestone >= 3 else "Forecasted"},
             {"stage": "Final Inland Leg", "delay_hours": round(s4_inland, 1), "status": "Realized" if milestone >= 4 else "Forecasted"},
         ]
-        
+
         return {
             "shipment_id": shipment_dict.get("shipment_id", "N/A"),
             "current_milestone": milestone,
@@ -244,7 +196,9 @@ class DelayPropagationEngine:
             "severity_tier": severity,
             "badge_color": badge_color,
             "stage_cascade": cascade,
-            "berth_window_miss_risk": bool(pred_delay_hours > 12.0 and float(shipment_dict.get("dest_port_congestion_idx", 0.5)) > 0.65),
+            "berth_window_miss_risk": bool(
+                pred_delay_hours > 12.0 and float(shipment_dict.get("dest_port_congestion_idx", 0.5)) > 0.65
+            ),
             "buffer_absorbed_hours": round(absorbed, 1),
         }
 

@@ -106,7 +106,8 @@ aiqon/
 │   └── shipments_dataset.csv         # 500 multi-stage container shipment records
 ├── models/
 │   ├── __init__.py                   # Package initializer
-│   ├── delay_propagation.py          # Multi-stage cascade predictive engine
+│   ├── feature_pipeline.py           # Feature engineering, matrix prep & milestone transformations
+│   ├── delay_propagation.py          # Multi-stage cascade predictive engine (GBDT & Random Forest)
 │   ├── explainability.py             # Factor attribution, waterfall & operational playbooks
 │   └── evaluation.py                 # Multi-metric benchmark comparator (5-fold CV)
 ├── app.py                            # Full Streamlit frontend application
