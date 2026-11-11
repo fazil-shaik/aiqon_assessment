@@ -23,7 +23,6 @@ from data.generator import generate_shipment_dataset, ROUTES, CARRIERS, CUSTOMS_
 # Streamlit Page Config
 st.set_page_config(
     page_title="Aiqon | AI Shipment ETA & Delay Propagation Engine",
-    page_icon="🚢",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -119,22 +118,21 @@ explainer = DelayExplainer(engine)
 # Header Section
 col_brand1, col_brand2 = st.columns([0.75, 0.25])
 with col_brand1:
-    st.markdown('<div class="main-header">🚢 Aiqon | AI Shipment ETA & Delay Propagation Engine</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">Aiqon | AI Shipment ETA & Delay Propagation Engine</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Multi-Stage Maritime Logistics Delay Cascading, Dynamic In-Flight Inference & Root-Cause Explainability</div>', unsafe_allow_html=True)
 with col_brand2:
     st.markdown("""
         <div style="text-align: right; padding-top: 10px;">
             <span style="background-color: #E0F2FE; color: #0369A1; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">
-                ● Production Model Online
+                Production Model Online
             </span>
         </div>
     """, unsafe_allow_html=True)
 
 # Sidebar Controls
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/cargo-ship.png", width=64)
     st.markdown("### **Fleet Control Tower**")
-    st.markdown("Configure operational filters and simulation parameters.")
+    st.markdown("Operational filters and simulation parameters.")
     
     selected_carrier_filter = st.selectbox(
         "Filter by Ocean Carrier",
@@ -144,7 +142,7 @@ with st.sidebar:
     selected_route_filter = st.selectbox(
         "Filter by Maritime Trade Lane",
         ["All Routes"] + list(ROUTES.keys()),
-        format_func=lambda x: "All Routes" if x == "All Routes" else f"{x}: {ROUTES[x]['origin'].split()[0]} ➔ {ROUTES[x]['destination'].split()[0]}"
+        format_func=lambda x: "All Routes" if x == "All Routes" else f"{x}: {ROUTES[x]['origin'].split()[0]} to {ROUTES[x]['destination'].split()[0]}"
     )
     
     sla_threshold_hours = st.slider("Target SLA Delay Threshold (Hours)", min_value=1.0, max_value=24.0, value=6.0, step=1.0)
@@ -167,11 +165,11 @@ if selected_route_filter != "All Routes":
 
 # Main Tab Navigation
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 Fleet Operations Dashboard",
-    "🚢 Live Journey & In-Flight ETA Predictor",
-    "🔍 Delay Propagation & Root-Cause AI",
-    "📈 Model Benchmark & Evaluation",
-    "📂 Dataset Explorer & Synthetic Simulator"
+    "Fleet Operations Dashboard",
+    "Live Journey & In-Flight ETA Predictor",
+    "Delay Propagation & Root-Cause AI",
+    "Model Benchmark & Evaluation",
+    "Dataset Explorer & Synthetic Simulator"
 ])
 
 # -------------------------------------------------------------
@@ -280,7 +278,7 @@ with tab1:
             "berth_window_missed": "mean"
         }).reset_index()
         route_perf.columns = ["Route", "Mean_Delay", "Median_Delay", "Std_Delay", "Berth_Miss_Rate"]
-        route_perf["Route_Name"] = route_perf["Route"].apply(lambda r: f"{ROUTES[r]['origin'].split()[0]} ➔ {ROUTES[r]['destination'].split()[0]}")
+        route_perf["Route_Name"] = route_perf["Route"].apply(lambda r: f"{ROUTES[r]['origin'].split()[0]} to {ROUTES[r]['destination'].split()[0]}")
         
         fig_route = px.bar(
             route_perf,
@@ -317,7 +315,7 @@ with tab1:
 # TAB 2: LIVE JOURNEY & IN-FLIGHT ETA PREDICTOR
 # -------------------------------------------------------------
 with tab2:
-    st.markdown("### 🚢 Live Shipment In-Flight ETA Predictor")
+    st.markdown("### Live Shipment In-Flight ETA Predictor")
     st.markdown(
         "Simulate in-flight journeys across operational milestones. Observe how ETA and delay risks "
         "dynamically update as real-world stage milestones are achieved or external disruptions arise."
@@ -446,17 +444,18 @@ with tab2:
     m_cols = st.columns(4)
     cascade_stages = prediction_result["stage_cascade"]
     
-    icons = ["🛫", "🌊", "⚓", "🚚"]
+    stage_labels = ["Stage 1: Origin", "Stage 2: Transit", "Stage 3: Port & Customs", "Stage 4: Inland"]
     for idx, (m_col, stage_info) in enumerate(zip(m_cols, cascade_stages)):
         with m_col:
             is_active = (selected_milestone >= idx)
-            status_text = "✅ Realized" if selected_milestone > idx else ("⏳ In Progress" if selected_milestone == idx else "🔮 Forecasted")
+            status_text = "Realized" if selected_milestone > idx else ("In Progress" if selected_milestone == idx else "Forecasted")
             border_col = "#10B981" if selected_milestone > idx else ("#3B82F6" if selected_milestone == idx else "#CBD5E1")
             st.markdown(f"""
             <div style="border: 2px solid {border_col}; border-radius: 8px; padding: 12px; background: {'#F0FDF4' if selected_milestone > idx else '#FFFFFF'};">
-                <div style="font-size: 1.1rem; font-weight: 700;">{icons[idx]} {stage_info['stage']}</div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: #64748B;">{stage_labels[idx]}</div>
+                <div style="font-size: 1.05rem; font-weight: 700; margin-top: 2px;">{stage_info['stage']}</div>
                 <div style="font-size: 0.85rem; color: #64748B; margin-top: 4px;">Status: <b>{status_text}</b></div>
-                <div style="font-size: 1.2rem; font-weight: 700; color: {'#EF4444' if stage_info['delay_hours'] > 4 else '#1E293B'}; margin-top: 6px;">
+                <div style="font-size: 1.15rem; font-weight: 700; color: {'#EF4444' if stage_info['delay_hours'] > 4 else '#1E293B'}; margin-top: 6px;">
                     {stage_info['delay_hours']:+.1f} hrs variance
                 </div>
             </div>
@@ -466,10 +465,10 @@ with tab2:
 # TAB 3: DELAY PROPAGATION & ROOT-CAUSE EXPLAINABILITY
 # -------------------------------------------------------------
 with tab3:
-    st.markdown("### 🔍 Root-Cause Attribution & Delay Cascade Dynamics")
+    st.markdown("### Root-Cause Attribution & Delay Cascade Dynamics")
     st.markdown(
         "Aiqon's AI deconstructs the shipment lifecycle into additive and compounding delay drivers. "
-        "Understand *why* delays emerge, whether buffer absorption occurred, and what operational action to take."
+        "Understand why delays emerge, whether buffer absorption occurred, and what operational action to take."
     )
     
     # Diagnostic narrative display
@@ -534,13 +533,13 @@ with tab3:
     # Operational Playbook Recommendations
     st.markdown("#### **Operational Playbook & Actionable Mitigation Interventions**")
     for rec in explanation_result["recommendations"]:
-        st.markdown(f"- 📋 **Recommendation:** {rec}")
+        st.markdown(f"- **Recommendation:** {rec}")
 
 # -------------------------------------------------------------
 # TAB 4: MODEL EVALUATION & BENCHMARK COMPARISON
 # -------------------------------------------------------------
 with tab4:
-    st.markdown("### 📈 Rigorous Model Benchmark & Quantitative Evaluation")
+    st.markdown("### Model Benchmark & Quantitative Evaluation")
     st.markdown(
         "Demonstrating model superiority against traditional industry baselines. "
         "Evaluated on regression metrics (MAE, RMSE, R²) and classification metrics (Accuracy, F1, ROC-AUC)."
@@ -632,7 +631,7 @@ with tab4:
 # TAB 5: DATASET EXPLORER & SYNTHETIC SIMULATOR
 # -------------------------------------------------------------
 with tab5:
-    st.markdown("### 📂 Dataset Explorer & Synthetic Data Generator")
+    st.markdown("### Dataset Explorer & Synthetic Simulator")
     st.markdown(
         "Aiqon's synthetic journey generator creates mathematically grounded multi-stage shipment histories "
         "faithfully simulating marine transit physics, stochastic dwell times, port berth window expirations, "
@@ -644,7 +643,7 @@ with tab5:
     
     csv_bytes = filtered_df.to_csv(index=False).encode("utf-8")
     st.download_button(
-        label="📥 Download Current Dataset as CSV",
+        label="Download Current Dataset (CSV)",
         data=csv_bytes,
         file_name="aiqon_shipments_dataset.csv",
         mime="text/csv"
@@ -659,7 +658,7 @@ with tab5:
         new_seed = st.number_input("Random Generator Seed", min_value=1, max_value=9999, value=42, step=1)
     with gen_c3:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-        if st.button("🔄 Generate & Retrain Engine"):
+        if st.button("Generate & Retrain Engine"):
             with st.spinner("Generating new synthetic logistics journeys..."):
                 new_df = generate_shipment_dataset(n_samples=new_samples, random_seed=new_seed)
                 new_df.to_csv("data/shipments_dataset.csv", index=False)

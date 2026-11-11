@@ -4,7 +4,7 @@
 set -e
 
 echo "=========================================================="
-echo "🚢 Aiqon AI Logistics Platform | ETA & Delay Propagation"
+echo "Aiqon AI Logistics Platform | ETA & Delay Propagation"
 echo "=========================================================="
 
 # Check for virtual environment

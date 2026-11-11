@@ -94,7 +94,7 @@ class DelayExplainer:
         narrative_lines = []
         if pred_delay > 6.0:
             narrative_lines.append(
-                f"⚠️ **Shipment is projected to incur a total delay of {pred_delay:+.1f} hours** "
+                f"**Alert:** Shipment is projected to incur a total delay of {pred_delay:+.1f} hours "
                 f"({pred_res['severity_tier']}) against its SLA."
             )
             narrative_lines.append(
@@ -109,29 +109,29 @@ class DelayExplainer:
             # Contextual Logistics Observations
             if pred_res["berth_window_miss_risk"]:
                 narrative_lines.append(
-                    "• 🚢 **Berth Window Risk**: Vessel arrival schedule exceeds terminal tolerance, triggering "
+                    "• **Berth Window Risk**: Vessel arrival schedule exceeds terminal tolerance, triggering "
                     "a missed berthing window penalty and non-linear outer anchorage dwell."
                 )
             if "Red" in customs_tier:
                 narrative_lines.append(
-                    "• 🔴 **Customs Alert**: Consignment flagged for **Red Channel Physical Examination**, "
+                    "• **Customs Alert**: Consignment flagged for **Red Channel Physical Examination**, "
                     "adding heavy inspection dwell at destination terminal."
                 )
             if weather_sev > 0.5:
                 narrative_lines.append(
-                    f"• 🌊 **Weather Shock**: High sea state / storm index ({weather_sev:.2f}) required vessel speed throttling."
+                    f"• **Weather Impact**: High sea state / storm index ({weather_sev:.2f}) required vessel speed throttling."
                 )
             if c_buffer < -0.5:
                 narrative_lines.append(
-                    f"• ⏱️ **Buffer Absorption**: Ocean transit absorbed {abs(c_buffer):.1f} hours through dynamic vessel speed adjustment."
+                    f"• **Buffer Absorption**: Ocean transit absorbed {abs(c_buffer):.1f} hours through dynamic vessel speed adjustment."
                 )
         else:
             narrative_lines.append(
-                f"✅ **Shipment is operating on schedule** (Estimated arrival {pred_res['predicted_eta']}, "
-                f"Net variance: {pred_delay:+.1f} hours). Low delay risk ({pred_res['delay_probability']}%)."
+                f"**Status: On Schedule.** Estimated arrival {pred_res['predicted_eta']}, "
+                f"Net variance: {pred_delay:+.1f} hours. Low delay risk ({pred_res['delay_probability']}%)."
             )
             narrative_lines.append(
-                f"• Buffer margins across {origin_port} ➔ {dest_port} are successfully absorbing minor fluctuations."
+                f"• Buffer margins across {origin_port} to {dest_port} are successfully absorbing minor fluctuations."
             )
 
         # Actionable Operational Recommendations

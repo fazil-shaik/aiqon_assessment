@@ -1,4 +1,4 @@
-# 🚢 Aiqon | AI Shipment ETA & Delay Propagation Engine
+# Aiqon | AI Shipment ETA & Delay Propagation Engine
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-App%20Online-FF4B4B.svg)](https://streamlit.io/)
@@ -11,7 +11,7 @@ This platform models cascading delays across multi-stage maritime and intermodal
 
 ---
 
-## 🌟 Key Highlights
+## Key Highlights
 
 1. **Multi-Stage Delay Propagation Modeling:**
    - Models stage-to-stage delay transfers across:
@@ -46,7 +46,7 @@ This platform models cascading delays across multi-stage maritime and intermodal
 
 ---
 
-## 📊 Benchmark & Quantitative Evaluation
+## Benchmark & Quantitative Evaluation
 
 Evaluated across 5-fold cross-validation on 500 multi-stage shipment journeys:
 
@@ -59,7 +59,7 @@ Evaluated across 5-fold cross-validation on 500 multi-stage shipment journeys:
 
 ---
 
-## 🚀 Quickstart Guide
+## Quickstart Guide
 
 ### Prerequisites
 - Python 3.10+ (tested on Python 3.10, 3.11, 3.12, and 3.14 on macOS / Linux / Windows)
@@ -97,7 +97,7 @@ Open [http://localhost:8501](http://localhost:8501) in your browser.
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 aiqon/
@@ -120,7 +120,7 @@ aiqon/
 
 ---
 
-## 📝 Deliverables Summary for Aiqon Evaluation
+## Deliverables Summary for Aiqon Evaluation
 
 1. **Code Repository:** Clean, modular, fully runnable Python backend and Streamlit frontend.
 2. **Technical Report:**
